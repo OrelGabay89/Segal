@@ -1,22 +1,21 @@
-﻿using CsvHelper.Configuration;
-using CsvHelper;
+﻿
 using IsraelTax.Shared.Models;
 using Newtonsoft.Json;
 using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.Configuration;
-using System.IO;
-using System.Net.Http;
+using CsvHelper.Configuration;
+using CsvHelper;
 
-namespace IsraelTax.App
+namespace Invoices
 {
-    public class InvoiceHandler
+    public class InvoiceService
     {
         public async Task RequestInvoiceNum(IConfiguration configuration)
         {
-            string directoryPath = @"C:\temp\tax";
+            string directoryPath = configuration["AppSettings:DirectoryPath"];
             Console.WriteLine("Reading csv file in path..." + directoryPath);
-            string filePath = Path.Combine(directoryPath, "data.csv");
+            string filePath = Path.Combine(directoryPath, configuration["AppSettings:FileName"]);
 
             // Ensure directory exists
             if (!Directory.Exists(directoryPath))

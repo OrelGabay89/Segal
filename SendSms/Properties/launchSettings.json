@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SendSms": {
+      "commandName": "Project",
+      "commandLineArgs": "\"0542559101,test,Segal\""
+    }
+  }
+}
