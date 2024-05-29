@@ -13,7 +13,6 @@ namespace SendSms
     {
         static async Task Main(string[] args)
         {
-            args = new string[] { "0542559101,hello,0504442135" };
             // Parse comma-separated arguments
             args = ParseCommaSeparatedArgs(args);
 
