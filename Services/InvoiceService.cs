@@ -6,11 +6,32 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using CsvHelper.Configuration;
 using CsvHelper;
+using Microsoft.Extensions.Logging;
+using Services;
 
 namespace Invoices
 {
     public class InvoiceService
     {
+        private readonly ILogger<SmsService> _logger;
+        private readonly string _apiUrl;
+        private readonly IConfiguration _configuration;
+        private readonly string _directoryPath;
+        private readonly string _isAliveUrl;
+        private readonly string _processingUrl;
+
+
+        public InvoiceService(ILogger<SmsService> logger, HttpClient httpClient, IConfiguration configuration)
+        {
+            _logger = logger;
+            _configuration = configuration; // Assign configuration to a private field
+            _directoryPath =  configuration["AppSettings:DirectoryPath"];
+            _apiUrl = configuration["SmsSettings:ApiUrl"];
+            _isAliveUrl = configuration["AppSettings:IsAliveUrl"];
+            _processingUrl = configuration["AppSettings:ProcessingUrl"];
+
+        }
+
         public async Task RequestInvoiceNum(IConfiguration configuration)
         {
             string directoryPath = configuration["AppSettings:DirectoryPath"];
@@ -20,27 +41,30 @@ namespace Invoices
             // Ensure directory exists
             if (!Directory.Exists(directoryPath))
             {
-                Console.WriteLine("Directory does not exist, creating directory...");
+                _logger.LogInformation("Directory does not exist, creating directory...");
+
                 Directory.CreateDirectory(directoryPath);
-                Console.WriteLine("Directory created at " + directoryPath);
+
+                _logger.LogInformation("Directory created at " + directoryPath);
+
             }
 
             // Check if the file exists
             if (!File.Exists(filePath))
             {
-                Console.WriteLine("Error: File does not exist at " + filePath);
+
+                _logger.LogError("Error: File does not exist at " + filePath);
                 return;
             }
 
-            // Check if the server is alive before proceeding
-            var isAliveUrl = configuration["AppSettings:IsAliveUrl"];
-            if (!await IsServerAlive(isAliveUrl))
+            if (!await IsServerAlive(_isAliveUrl))
             {
-                Console.WriteLine("Server is not responding. Exiting process.");
+                _logger.LogError("Server is not responding. Exiting process.");
                 return;
             }
 
-            Console.WriteLine("Server is alive. Start reading file...");
+            _logger.LogInformation("Server is alive.Start reading file...");
+
             var records = ReadDataFromCsv(filePath);
             var httpClient = new HttpClient();
 
@@ -48,20 +72,21 @@ namespace Invoices
             {
                 if (!ValidateData(record))
                 {
-                    Console.WriteLine("Validation error");
+                    _logger.LogError("Validation error");
+
                     continue;
                 }
 
-                string url = configuration["AppSettings:ProcessingUrl"];
-                Console.WriteLine($"URL from config: {url}");
-                Console.WriteLine("Start requesting server...");
+                _logger.LogInformation($"URL from config: {_processingUrl}");
+                _logger.LogInformation("Start requesting server...");
 
-                var response = await SendDataToServer(httpClient, url, record);
-                Console.WriteLine($"Server response for {record.Id}: {response}");
+                var response = await SendDataToServer(httpClient, _processingUrl, record);
+
+                _logger.LogInformation($"Server response for {record.Id}: {response}");
             }
         }
 
-        private static async Task<bool> IsServerAlive(string url)
+        private async Task<bool> IsServerAlive(string url)
         {
             using (var httpClient = new HttpClient())
             {
@@ -72,13 +97,14 @@ namespace Invoices
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Failed to reach server: {ex.Message}");
+                    _logger.LogError($"Failed to reach server: {ex.Message}");
+
                     return false;
                 }
             }
         }
 
-        private static IEnumerable<InvoiceCSVData> ReadDataFromCsv(string filePath)
+        private IEnumerable<InvoiceCSVData> ReadDataFromCsv(string filePath)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
