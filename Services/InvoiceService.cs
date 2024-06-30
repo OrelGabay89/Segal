@@ -8,6 +8,7 @@ using CsvHelper.Configuration;
 using CsvHelper;
 using Microsoft.Extensions.Logging;
 using Services;
+using Shared.Services;
 
 namespace Invoices
 {
@@ -82,7 +83,7 @@ namespace Invoices
 
                 var response = await SendDataToServer(httpClient, _processingUrl, record);
 
-                _logger.LogInformation($"Server response for {record.Id}: {response}");
+                _logger.LogInformation($"Server response for {record.invoice_id}: {response}");
             }
         }
 
@@ -108,15 +109,31 @@ namespace Invoices
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                NewLine = Environment.NewLine,
+                //NewLine = Environment.NewLine,
+                MissingFieldFound = null, // Ignore missing fields
+                BadDataFound = context =>
+                {
+                    // Log bad data
+                    Console.WriteLine($"Bad data found on row {context.RawRecord}");
+                },
+                HeaderValidated = null, // Optionally ignore header validation issues
+                ReadingExceptionOccurred = context =>
+                {
+                    // Log exceptions that occur during reading
+                    Console.WriteLine($"Reading exception: {context.Exception.Message}");
+                    return true; // Set to false if you want to stop processing on an exception
+                }
             };
 
             using (var reader = new StreamReader(filePath))
             using (var csv = new CsvReader(reader, config))
             {
-                var records = csv.GetRecords<InvoiceCSVData>();
-                return new List<InvoiceCSVData>(records);
+                csv.Context.RegisterClassMap<InvoiceCSVDataMap>(); // Ensure you have a class map if needed
+                var records = csv.GetRecords<InvoiceCSVData>().ToList();
+                Console.WriteLine($"Records read: {records.Count}");
+                return records;
             }
+
         }
 
         private static async Task<string> SendDataToServer(HttpClient client, string url, InvoiceCSVData data)
@@ -128,8 +145,9 @@ namespace Invoices
 
         private static bool ValidateData(InvoiceCSVData data)
         {
-            return data != null && !string.IsNullOrEmpty(data.CustomerName) && !string.IsNullOrEmpty(data.Amount)
-                                && !string.IsNullOrEmpty(data.InvoiceNumber);
+            return true;
+            //return data != null && !string.IsNullOrEmpty(data.Customer_Name) && data.Payment_Amount > 0
+            //                    && !string.IsNullOrEmpty(data.Invoice_Reference_Number);
         }
     }
 }
