@@ -46,6 +46,7 @@ namespace Invoices
             string directoryPath = configuration["AppSettings:DirectoryPath"];
             Console.WriteLine("Reading csv file in path..." + directoryPath);
             string filePath = Path.Combine(directoryPath, configuration["AppSettings:FileName"]);
+            string outputFilePath = Path.Combine(directoryPath, configuration["AppSettings:OutputFileName"]);
 
             if (!Directory.Exists(directoryPath))
             {
@@ -117,15 +118,23 @@ namespace Invoices
                 }
             }
 
-            WriteDataToCsv(filePath, records);
+            var projectedRecords = validRecords.Select(record => new InvoiceCSVDataProjection
+            {
+                Invoice_ID = record.Invoice_ID,
+                ConfirmationNumber = record.ConfirmationNumber,
+                Last9Digits = record.ConfirmationNumber.Length > 9 ? record.ConfirmationNumber.Substring(record.ConfirmationNumber.Length - 9) : record.ConfirmationNumber
+            });
+
+            WriteDataToCsv(outputFilePath, projectedRecords);
         }
 
-        private void WriteDataToCsv(string filePath, IEnumerable<InvoiceCSVData> records)
+        private void WriteDataToCsv(string filePath, IEnumerable<InvoiceCSVDataProjection> records)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
                 ShouldQuote = (field) => true,
-                Delimiter = ","
+                Delimiter = ",",
+                HasHeaderRecord = false // Add this line to omit headers
             };
 
             using (var writer = new StreamWriter(filePath, false, new UTF8Encoding(true))) // Add BOM for UTF-8
@@ -147,6 +156,7 @@ namespace Invoices
                     Console.WriteLine($"Bad data found on row {context.RawRecord}");
                 },
                 HeaderValidated = null,
+                HasHeaderRecord = false,
                 ReadingExceptionOccurred = context =>
                 {
                     Console.WriteLine($"Reading exception: {context.Exception.Message}");
@@ -219,9 +229,8 @@ namespace Invoices
             var refreshTokenExpiration = tokenResponse["refresh_token_expires_in"]?.ToObject<int>() ?? 7546005;
 
             // Mark existing tokens as revoked
-            var filter = Builders<Token>.Filter.Empty;
-            var update = Builders<Token>.Update.Set(t => t.Status, "Revoked");
-            await _tokenService.UpdateTokenAsync(filter, update);
+
+            await _tokenService.RevokeAllTokensAsync();
 
             // Insert the new token
             var newToken = new Token
@@ -281,13 +290,6 @@ namespace Invoices
 
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();
-                //_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
-
-                //var request = new HttpRequestMessage(HttpMethod.Post, "https://ita-api.taxes.gov.il/shaam/tsandbox/Invoices/v1/Approval");
-                //request.Content = new StringContent(invoiceDetails, System.Text.Encoding.UTF8, "application/json");
-
-                //HttpResponseMessage response = await _httpClient.SendAsync(request);
-                //response.EnsureSuccessStatusCode();
 
                 var responseContent = await response.Content.ReadAsStringAsync();
                 JObject invoiceResponse = JObject.Parse(responseContent);

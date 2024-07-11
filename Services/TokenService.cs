@@ -25,9 +25,9 @@ namespace Services
             return await _tokens.Find(filter).ToListAsync();
         }
 
-        public async Task<UpdateResult> UpdateTokenAsync(FilterDefinition<Token> filter, UpdateDefinition<Token> update)
+        public async Task<UpdateResult> UpdateTokensAsync(FilterDefinition<Token> filter, UpdateDefinition<Token> update)
         {
-            return await _tokens.UpdateOneAsync(filter, update);
+            return await _tokens.UpdateManyAsync(filter, update);
         }
 
         public async Task<UpdateResult> MarkTokenAsRevokedAsync(FilterDefinition<Token> filter)
@@ -40,6 +40,15 @@ namespace Services
         {
             await _tokens.InsertOneAsync(token);
         }
+
+        public async Task<UpdateResult> RevokeAllTokensAsync()
+        {
+            var filter = Builders<Token>.Filter.Empty; // This filter matches all documents
+            var update = Builders<Token>.Update.Set(t => t.Status, "Revoked"); // Assumes 'Status' is the field to be updated
+
+            return await _tokens.UpdateManyAsync(filter, update);
+        }
+
 
     }
 }

@@ -6,6 +6,6 @@ namespace Services.Interfaces
     public interface ITokenService
     {
         Task<List<Token>> GetTokensAsync();
-        Task<UpdateResult> UpdateTokenAsync(FilterDefinition<Token> filter, UpdateDefinition<Token> update);
+        Task<UpdateResult> UpdateTokensAsync(FilterDefinition<Token> filter, UpdateDefinition<Token> update);
     }
 }
